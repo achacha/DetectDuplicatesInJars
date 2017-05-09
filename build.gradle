@@ -67,6 +67,6 @@ dependencies {
 run {
     // Manually run: ./gradlew run -Pmyargs=[relative dir path]
     if (project.hasProperty("myargs")) {
-        args myargs
+        args myargs.split(',')
     }
 }

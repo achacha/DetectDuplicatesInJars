@@ -32,6 +32,11 @@ public class JarCollector {
     */
     private Map<Path, JarShmenge> classes = new HashMap<>();
 
+    /*
+     * Collection of jar name to path (there may be more that one location for same jar
+     */
+    private Map<String, ArrayList<Path>> jarNameToFilenames = new HashMap<>();
+
     public Map<String,Collection<String>> detectDuplicateClasses() {
         // Iterate over all jars and collect classes while checking for duplicates
         Map<String,ArrayList<String>> classToJar = new HashMap<>();
@@ -63,7 +68,8 @@ public class JarCollector {
         public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
             if (StringUtils.endsWithIgnoreCase(file.toString(), ".jar")) {
                 LOGGER.info("Processing {}", file);
-                classes.put(file, new JarShmenge((file)));
+                if (!isDuplicateJar(file))
+                    classes.put(file, new JarShmenge((file)));
             }
             else {
                 LOGGER.info("Skipping {}", file);
@@ -82,6 +88,20 @@ public class JarCollector {
         }
     }
 
+    /**
+     * Check if jar file at given path already exists
+     * Duplicates may exist at different paths
+     *
+     * @param path for jar
+     * @return true if already processed
+     */
+    private boolean isDuplicateJar(Path path) {
+        String filename = path.getFileName().toString();
+        ArrayList<Path> jarPaths = jarNameToFilenames.computeIfAbsent(filename, k -> new ArrayList<>());
+        jarPaths.add(path);
+        return jarPaths.size() > 1;
+    }
+
     private JarVisitor visitor = new JarVisitor();
 
     public void gatherAt(Path rootClassPath) {
@@ -90,6 +110,10 @@ public class JarCollector {
         } catch (IOException e) {
             LOGGER.error("Failed to walk directory tree looking for jars", e);
         }
+    }
+
+    public Map<String, ArrayList<Path>> getJarNameToFilenames() {
+        return jarNameToFilenames;
     }
 
     public Map<Path, JarShmenge> getClasses() {
