@@ -1,9 +1,5 @@
 package org.achacha.gelkis;
 
-import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.FileVisitor;
@@ -13,8 +9,10 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import static java.util.stream.Collectors.toMap;
 
@@ -25,12 +23,17 @@ public class JarCollector {
     /**
      * Global logger available when class specific is not needed
      */
-    public static final Logger LOGGER = LoggerFactory.getLogger(JarCollector.class);
+    public static final Logger LOGGER = Logger.getLogger(DetectDuplicatesInJarsMain.class.getName());
 
     /*
     Collection of processed jar files
     */
-    private Map<Path, JarShmenge> classes = new HashMap<>();
+    private Map<Path, JarBreaker> classes = new HashMap<>();
+
+    /*
+    List of jar base names to ignore
+     */
+    private List<String> ignoreJarBasename = new ArrayList<>();
 
     /*
      * Collection of jar name to path (there may be more that one location for same jar
@@ -58,32 +61,54 @@ public class JarCollector {
                 .collect(toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
+    /**
+     * Add a base filename to ignore
+     * e.g. "batik-", "wstx-"
+     * @param basename String
+     */
+    public void addIgnoreBasename(String basename) {
+        ignoreJarBasename.add(basename);
+    }
+
     private class JarVisitor implements FileVisitor<Path> {
+        private final List<String> ignoreBasename;
+
+        JarVisitor(List<String> ignoreBasename) {
+            this.ignoreBasename = ignoreBasename;
+        }
+
         @Override
-        public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+        public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
             return FileVisitResult.CONTINUE;
         }
 
         @Override
-        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-            if (StringUtils.endsWithIgnoreCase(file.toString(), ".jar")) {
-                LOGGER.info("Processing {}", file);
-                if (!isDuplicateJar(file))
-                    classes.put(file, new JarShmenge((file)));
+        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+            // Process only jars that are not ignored
+            if (file.toString().toLowerCase().endsWith(".jar")) {
+                String filename = file.getFileName().toString();
+                if (ignoreBasename.stream().anyMatch(filename::startsWith)) {
+                    LOGGER.info("Ignoring JAR basename: "+file);
+                }
+                else {
+                    LOGGER.info("Processing " + file);
+                    if (!isDuplicateJar(file))
+                        classes.put(file, new JarBreaker((file)));
+                }
             }
             else {
-                LOGGER.info("Skipping {}", file);
+                LOGGER.info("Skipping " + file);
             }
             return FileVisitResult.CONTINUE;
         }
 
         @Override
-        public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
+        public FileVisitResult visitFileFailed(Path file, IOException exc) {
             return FileVisitResult.CONTINUE;
         }
 
         @Override
-        public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+        public FileVisitResult postVisitDirectory(Path dir, IOException exc) {
             return FileVisitResult.CONTINUE;
         }
     }
@@ -102,13 +127,13 @@ public class JarCollector {
         return jarPaths.size() > 1;
     }
 
-    private JarVisitor visitor = new JarVisitor();
+    private JarVisitor visitor = new JarVisitor(ignoreJarBasename);
 
     public void gatherAt(Path rootClassPath) {
         try {
             Files.walkFileTree(rootClassPath, visitor);
         } catch (IOException e) {
-            LOGGER.error("Failed to walk directory tree looking for jars", e);
+            LOGGER.log(Level.SEVERE, "Failed to walk directory tree looking for jars", e);
         }
     }
 
@@ -116,7 +141,7 @@ public class JarCollector {
         return jarNameToFilenames;
     }
 
-    public Map<Path, JarShmenge> getClasses() {
+    public Map<Path, JarBreaker> getClasses() {
         return classes;
     }
 }
