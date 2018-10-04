@@ -22,14 +22,9 @@ public class DetectDuplicatesInJarsMain {
         }
 
         // Scan all directories into one lump collection
-        JarCollector jarCollector = new JarCollector();
-        jarCollector.addIgnoreBasename("woodstox-");
-        jarCollector.addIgnoreBasename("wstx-asl-");
-        jarCollector.addIgnoreBasename("batik-");
-        jarCollector.addIgnoreBasename("mail-");
-        jarCollector.addIgnoreBasename("axis2-");
-        jarCollector.addIgnoreBasename("javax.inject-");
-        jarCollector.addIgnoreBasename("tomcat-util-");
+        JarCollector jarCollector = JarCollector.builder()
+                .withConfig("DetectDuplicatesInJars.json")
+                .build();
 
         for (String pathToTest : args) {
             LOGGER.info("Checking directory: " + pathToTest);
@@ -63,7 +58,7 @@ public class DetectDuplicatesInJarsMain {
         if (duplicates.size() > 0) {
             LOGGER.info("Duplicates detected\n---\n");
             duplicates.forEach((key, value) -> LOGGER.info(
-                    key + "\n\t" + value.stream().collect(Collectors.joining("\n\t")))
+                    key + "\n\t" + String.join("\n\t", value))
             );
             System.exit(-1);
         } else

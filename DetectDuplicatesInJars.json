@@ -1,0 +1,13 @@
+{
+  "ignorePrefix": [
+    "woodstox-",
+    "wstx-asl-",
+    "batik-",
+    "dagger-spi-",
+    "dagger-compiler-",
+    "tomcat-util-",
+    "axis2-",
+    "javax.inject-",
+    "javax.mail-"
+  ]
+}

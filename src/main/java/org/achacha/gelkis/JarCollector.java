@@ -1,5 +1,14 @@
 package org.achacha.gelkis;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.google.gson.stream.JsonReader;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.FileVisitor;
@@ -23,7 +32,61 @@ public class JarCollector {
     /**
      * Global logger available when class specific is not needed
      */
-    public static final Logger LOGGER = Logger.getLogger(DetectDuplicatesInJarsMain.class.getName());
+    static final Logger LOGGER = Logger.getLogger(DetectDuplicatesInJarsMain.class.getName());
+
+    static class Builder {
+        private List<String> ignorePrefix = new ArrayList<>();
+
+        /**
+         * Read config file
+         * {
+         *     "ignorePrefix": [ ... ]
+         * }
+         * @param filename JSON filename that contains config
+         * @return Builder
+         */
+        public Builder withConfig(String filename) {
+            File file = new File(filename);
+            if (file.canRead()) {
+                try (
+                        FileReader rd = new FileReader(file);
+                        JsonReader reader = new JsonReader(rd)
+                ) {
+                    JsonObject configObject = new JsonParser().parse(reader).getAsJsonObject();
+                    JsonElement je = configObject.get("ignorePrefix");
+                    if (je != null && je.isJsonArray()) {
+                        JsonArray ary = je.getAsJsonArray();
+                        ary.forEach(item->ignorePrefix.add(item.getAsString()));
+                        LOGGER.log(Level.INFO, "Ignore prefixes: {}", ignorePrefix);
+                    }
+                    else {
+                        LOGGER.log(Level.INFO, "ignorePrefix not found, nothing to ignore");
+                    }
+                } catch (IOException e) {
+                    LOGGER.log(Level.SEVERE, "Failed to read config file: "+file.getAbsolutePath(), e);
+                }
+            }
+            else
+                throw new RuntimeException("Unable to read config: "+filename+" ("+file.getAbsolutePath()+")");
+
+            return this;
+        }
+
+        public JarCollector build() {
+            JarCollector jc = new JarCollector();
+            ignorePrefix.forEach(jc::addIgnoreBasename);
+            return jc;
+        }
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    /**
+     * @see JarCollector#builder()
+     */
+    private JarCollector() {}
 
     /*
     Collection of processed jar files
